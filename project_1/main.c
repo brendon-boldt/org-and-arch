@@ -9,6 +9,7 @@ int _button2;
 //
 
 unsigned char num1, num2;
+int byteCounter = 0;
 
 int curScreen = 0;
 int contrast = 0;
@@ -38,13 +39,18 @@ void setup() {
 void splashScreen() {
 }
 
-void byte1Screen() {
-}
-
-void byte2Screen() {
+void byteScreen(unsigned char * byte) {
+	if (press1) {
+		*byte ^= 1 << byteCounter;
+	} else if (press2) {
+		byteCounter = (byteCounter + 1) % 8;
+	} else if (press12) {
+		byteCounter = 0;
+	}
 }
 
 void solutionScreen() {
+	printf("solution: %d\n", num1 + num2);
 }
 
 void contrastScreen() {
@@ -98,13 +104,15 @@ void loop() {
 
 	switch (curScreen) {
 		case 0: splashScreen(); break;
-		case 1: byte1Screen(); break;
-		case 2: byte2Screen(); break;
+		case 1: byteScreen(&num1); break;
+		case 2: byteScreen(&num2); break;
 		case 3: solutionScreen(); break;
 		case 4: splashScreen(); break;
 	}
 
-	printf("At screen: %d\n", curScreen);
+	//printf("At screen: %d\n", curScreen);
+	
+	printf("bytes: %d %d\n", num1, num2);
 	
 	//printf("press: %d %d %d\n", press1, press2, press12);
 
@@ -115,11 +123,35 @@ void loop() {
 
 int main() {
 	setup();
-	_button1 = HIGH;
-	_button2 = HIGH;
+	press12 = true;
 	loop();
-	_button1 = LOW;
-	_button2 = LOW;
+	press1 = true;
+	loop();
+	press2 = true;
+	loop();
+	press1 = true;
+	loop();
+	press2 = true;
+	loop();
+	press1 = true;
+	loop();
+	press2 = true;
+	loop();
+	press1 = true;
+	loop();
+	press2 = true;
+	loop();
+	press12 = true;
+	loop();
+	press1 = true;
+	loop();
+	press2 = true;
+	loop();
+	press1 = true;
+	loop();
+	press2 = true;
+	loop();
+	press12 = true;
 	loop();
 	return 0;
 }
