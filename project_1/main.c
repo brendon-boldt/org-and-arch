@@ -54,6 +54,12 @@ void solutionScreen() {
 }
 
 void contrastScreen() {
+	if (press1) 
+		contrast -= 10;
+	else if (press2) 
+		contrast += 10;
+	contrast = (contrast < 0) ? 0 : contrast;
+	contrast = (contrast > 100) ? 100 : contrast;
 }
 
 bool isReleased(ButtonState * b) {
@@ -107,12 +113,13 @@ void loop() {
 		case 1: byteScreen(&num1); break;
 		case 2: byteScreen(&num2); break;
 		case 3: solutionScreen(); break;
-		case 4: splashScreen(); break;
+		case 4: contrastScreen(); break;
 	}
 
 	//printf("At screen: %d\n", curScreen);
 	
-	printf("bytes: %d %d\n", num1, num2);
+	//printf("contrast: %d\n", contrast);
+	//printf("bytes: %d %d\n", num1, num2);
 	
 	//printf("press: %d %d %d\n", press1, press2, press12);
 
@@ -125,33 +132,17 @@ int main() {
 	setup();
 	press12 = true;
 	loop();
-	press1 = true;
-	loop();
-	press2 = true;
-	loop();
-	press1 = true;
-	loop();
-	press2 = true;
-	loop();
-	press1 = true;
-	loop();
-	press2 = true;
-	loop();
-	press1 = true;
-	loop();
-	press2 = true;
+	press12 = true;
 	loop();
 	press12 = true;
 	loop();
-	press1 = true;
-	loop();
-	press2 = true;
-	loop();
-	press1 = true;
-	loop();
-	press2 = true;
-	loop();
 	press12 = true;
+	loop();
+	press2 = true;
+	loop();
+	press2 = true;
+	loop();
+	press2 = true;
 	loop();
 	return 0;
 }
