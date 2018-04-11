@@ -12,6 +12,7 @@ int byteCounter = 0;
 int curScreen = 0;
 int contrast = 0;
 
+// Easily keep track of button states
 typedef struct {
   int cur;
   int prev;
@@ -21,9 +22,12 @@ ButtonState b1, b2;
 
 bool press1 = false, press2 = false, press12 = false;
 
+// Store the type of press as a binary number where each bit
+// represents a button press. This allows for multi-button presses
 // 0 - none, 1 - b1, 2 - b2, 3 - b1 & b2
 int pressType = 0;
 
+// Keep track of whether the screen needs updating
 bool updateScreen = true;
 
 void splashScreen() {
@@ -36,6 +40,7 @@ void splashScreen() {
   }
 }
 
+// Print 8 bits
 void printByte(unsigned char * n) {
   for (int i = 0; i < 8; ++i) {
     lcd.print((*n >> (7-i)) & 1);
@@ -44,11 +49,13 @@ void printByte(unsigned char * n) {
 
 void byteScreen(unsigned char * n, int byteNum) {
   if (press1) {
+    // Change the correct bit based on where the counter is
     *n ^= 0x80 >> byteCounter;
     updateScreen = true;
   } else if (press2) {
     //byteCounter = (byteCounter + 1) % 8;
     byteCounter = byteCounter + 1;
+    // When the last byte is reached, simulate a next-screen press
     if (byteCounter == 8) {
       byteCounter = 0;
       press12 = true;
@@ -78,6 +85,7 @@ void solutionScreen() {
     sum = num1 + num2;
     //lcd.print(sum);
     lcd.setCursor(0,1);
+    // Add the carry bit if the number overflows 1 byte
     if (num1 + num2 > 0xff)
       lcd.print(1);
     else
@@ -96,6 +104,7 @@ void contrastScreen() {
     contrast -= 10;
     updateScreen = true;
   }
+  // Ensure the contrast stays within range
   contrast = (contrast < 0) ? 0 : contrast;
   contrast = (contrast > 100) ? 100 : contrast;
 
@@ -115,6 +124,7 @@ void contrastScreen() {
   }
 }
 
+// Determine if the button was just recently released
 bool isReleased(ButtonState * b) {
   return b->cur == HIGH && b->prev == LOW;
 }
@@ -123,6 +133,9 @@ void checkButtons() {
   b1.cur = digitalRead(button1Pin);
   b2.cur = digitalRead(button2Pin);
 
+  // Use ing OR-equals allows for different buttons to be
+  // registered as they pressed sequentially (if the first ones
+  // remain held down.
   if (b1.cur == LOW)
     pressType |= 1;
   if (b2.cur == LOW)
@@ -133,24 +146,42 @@ void checkButtons() {
       break;
     case 1:
       if (isReleased(&b1)) {
-        press1 = true;
-        pressType = 0;
+        // Debouncing: ensure the button is released for 0.2 seconds
+        bool debounce = true;
+        for (int i = 0; i < 8; ++i) {
+          delay(10);
+          debounce &= (digitalRead(button1Pin) == HIGH) ? true : false;
+        }
+        if (debounce) {
+          press1 = true;
+          pressType = 0;
+        }
       }
       break;
     case 2:
       if (isReleased(&b2)) {
-        press2 = true;
-        pressType = 0;
+        // Debouncing: ensure the button is released for 0.2 seconds
+        bool debounce = true;
+        for (int i = 0; i < 8; ++i) {
+          delay(10);
+          debounce &= (digitalRead(button2Pin) == HIGH) ? true : false;
+        }
+        if (debounce) {
+          press2 = true;
+          pressType = 0;
+        }
       }
       break;
     case 1 | 2:
       //if (isReleased(&b1) || isReleased(&b2)) {
+      // Register the double press when both buttons are released
       if (b1.cur == HIGH && b2.cur == HIGH) {
         press12 = true;
         pressType = 0;
       }
   }
 
+  // Button press debugging
   if (press1) 
     Serial.println("P1");
   if (press2) 
@@ -175,6 +206,7 @@ void setup() {
 
   Serial.begin(9600);
   lcd.begin(16, 2);
+  // Make sure the LCD is working
   lcd.print("/(;`^`)/");
   Serial.println("Setup complete.");
 
@@ -182,37 +214,39 @@ void setup() {
 
 void loop() {
   analogWrite(contrastPin, (contrast/100.0)*255);
-  Serial.println(contrast);
   //analogWrite(contrastPin, 0);
 
-	checkButtons();
+  checkButtons();
 
-	switch (curScreen) {
-		case 0: splashScreen(); break;
-		case 1: byteScreen(&num1, 1); break;
-		case 2: byteScreen(&num2, 2); break;
-		case 3: solutionScreen(); break;
-		case 4: contrastScreen(); break;
-	}
+  switch (curScreen) {
+    case 0: splashScreen(); break;
+    case 1: byteScreen(&num1, 1); break;
+    case 2: byteScreen(&num2, 2); break;
+    case 3: solutionScreen(); break;
+    case 4: contrastScreen(); break;
+  }
 
-	
-	if (press12) {
+  
+  // Handle a next screen-press
+  if (press12) {
     updateScreen = true;
     lcd.clear();
+
+    // Ensure that the splash screen is only shown at the beginning
     if (curScreen == 4)
       curScreen = 1;
-		else
+    else
       ++curScreen;
   }
 
-	//printf("At screen: %d\n", curScreen);
-	
-	//printf("contrast: %d\n", contrast);
-	//printf("bytes: %d %d\n", num1, num2);
-	
-	//printf("press: %d %d %d\n", press1, press2, press12);
+  //printf("At screen: %d\n", curScreen);
+  
+  //printf("contrast: %d\n", contrast);
+  //printf("bytes: %d %d\n", num1, num2);
+  
+  //printf("press: %d %d %d\n", press1, press2, press12);
 
-	press1 = false;
-	press2 = false;
-	press12 = false;
+  press1 = false;
+  press2 = false;
+  press12 = false;
 }
