@@ -1,10 +1,13 @@
 #include <LiquidCrystal.h>
 #include <stdbool.h>
-LiquidCrystal lcd(8, 9, 2, 3, 4, 5);
+LiquidCrystal lcd(6, 7, 2, 3, 4, 5);
 
-const int contrastPin = 11;
+const int contrastPin = 9;
 const int button1Pin = 12;
 const int button2Pin = 13;
+const int button3Pin = 11;
+const int potPin = A5;
+const int buzzerPin = 8;
 
 unsigned char num1, num2;
 int byteCounter = 0;
@@ -18,13 +21,13 @@ typedef struct {
   int prev;
 } ButtonState;
 
-ButtonState b1, b2;
+ButtonState b1, b2, b3;
 
-bool press1 = false, press2 = false, press12 = false;
+bool press1 = false, press2 = false, press12 = false, press3 = false;
 
 // Store the type of press as a binary number where each bit
 // represents a button press. This allows for multi-button presses
-// 0 - none, 1 - b1, 2 - b2, 3 - b1 & b2
+// 0 - none, 1 - b1, 2 - b2, 3 - b1 & b2, 4 - b3
 int pressType = 0;
 
 // Keep track of whether the screen needs updating
@@ -132,6 +135,7 @@ bool isReleased(ButtonState * b) {
 void checkButtons() {
   b1.cur = digitalRead(button1Pin);
   b2.cur = digitalRead(button2Pin);
+  b3.cur = digitalRead(button3Pin);
 
   // Use ing OR-equals allows for different buttons to be
   // registered as they pressed sequentially (if the first ones
@@ -140,13 +144,15 @@ void checkButtons() {
     pressType |= 1;
   if (b2.cur == LOW)
     pressType |= 2;
+  if (b3.cur == LOW)
+    pressType |= 4;
 
   switch (pressType) {
     case 0:
       break;
     case 1:
       if (isReleased(&b1)) {
-        // Debouncing: ensure the button is released for 0.2 seconds
+        // Debouncing
         bool debounce = true;
         for (int i = 0; i < 8; ++i) {
           delay(10);
@@ -160,7 +166,7 @@ void checkButtons() {
       break;
     case 2:
       if (isReleased(&b2)) {
-        // Debouncing: ensure the button is released for 0.2 seconds
+        // Debouncing
         bool debounce = true;
         for (int i = 0; i < 8; ++i) {
           delay(10);
@@ -179,6 +185,23 @@ void checkButtons() {
         press12 = true;
         pressType = 0;
       }
+    break;  
+    case 4:
+      if (isReleased(&b3)) {
+        // Debouncing
+        bool debounce = true;
+        for (int i = 0; i < 8; ++i) {
+          delay(10);
+          debounce &= (digitalRead(button3Pin) == HIGH) ? true : false;
+        }
+        if (debounce) {
+          press3 = true;
+          pressType = 0;
+        }
+      }
+      break;
+    default:
+      pressType = 0;
   }
 
   // Button press debugging
@@ -188,9 +211,12 @@ void checkButtons() {
     Serial.println("P2");
   if (press12) 
     Serial.println("P12");
+  if (press3) 
+    Serial.println("P3");
 
   b1.prev = b1.cur;
   b2.prev = b2.cur;
+  b3.prev = b3.cur;
 }
 
 
@@ -203,6 +229,8 @@ void setup() {
   b1.prev = HIGH;
   b2.cur  = HIGH;
   b2.prev = HIGH;
+  b3.cur  = HIGH;
+  b3.prev = HIGH;
 
   Serial.begin(9600);
   lcd.begin(16, 2);
@@ -245,8 +273,13 @@ void loop() {
   //printf("bytes: %d %d\n", num1, num2);
   
   //printf("press: %d %d %d\n", press1, press2, press12);
+  
+  Serial.println(analogRead(potPin));
+  if (press3)
+    tone(buzzerPin, 443, 100);
 
   press1 = false;
   press2 = false;
   press12 = false;
+  press3 = false;
 }
