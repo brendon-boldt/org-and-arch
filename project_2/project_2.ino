@@ -9,9 +9,6 @@ const int button3Pin = 11;
 const int potPin = A5;
 const int buzzerPin = 8;
 
-unsigned char num1, num2;
-int byteCounter = 0;
-
 int curScreen = 0;
 int contrast = 0;
 
@@ -23,7 +20,10 @@ typedef struct {
 
 ButtonState b1, b2, b3;
 
-bool press1 = false, press2 = false, press12 = false, press3 = false;
+bool press1 = false,
+  press2 = false,
+  press12 = false,
+  press3 = false;
 
 // Store the type of press as a binary number where each bit
 // represents a button press. This allows for multi-button presses
@@ -33,105 +33,23 @@ int pressType = 0;
 // Keep track of whether the screen needs updating
 bool updateScreen = true;
 
-void splashScreen() {
-  if (updateScreen) {
-    lcd.setCursor(0,0);
-    lcd.write("Welcome to the");
-    lcd.setCursor(0,1);
-    lcd.print("Splash Screen!");
-    updateScreen = false;
-  }
-}
-
-// Print 8 bits
-void printByte(unsigned char * n) {
-  for (int i = 0; i < 8; ++i) {
-    lcd.print((*n >> (7-i)) & 1);
-  }
-}
-
-void byteScreen(unsigned char * n, int byteNum) {
-  if (press1) {
-    // Change the correct bit based on where the counter is
-    *n ^= 0x80 >> byteCounter;
-    updateScreen = true;
-  } else if (press2) {
-    //byteCounter = (byteCounter + 1) % 8;
-    byteCounter = byteCounter + 1;
-    // When the last byte is reached, simulate a next-screen press
-    if (byteCounter == 8) {
-      byteCounter = 0;
-      press12 = true;
-    }
-  } else if (press12) {
-    byteCounter = 0;
-  }
-  
-  if (updateScreen) {
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("Byte ");
-    lcd.print(byteNum);
-    lcd.print(":");
-    //lcd.print(*n);
-    lcd.setCursor(0,1);
-    printByte(n);
-    updateScreen = false;
-  }
-}
-
-void solutionScreen() {
-  if (updateScreen) {
-    lcd.setCursor(0,0);
-    lcd.print("Sum:");
-    unsigned char sum;
-    sum = num1 + num2;
-    //lcd.print(sum);
-    lcd.setCursor(0,1);
-    // Add the carry bit if the number overflows 1 byte
-    if (num1 + num2 > 0xff)
-      lcd.print(1);
-    else
-      lcd.print(0);
-    printByte(&sum);
-    updateScreen = false;
-  }
-  //printf("solution: %d\n", num1 + num2);
-}
-
-void contrastScreen() {
-  if (press1) {
-    contrast += 10;
-    updateScreen = true;
-  } else if (press2) {
-    contrast -= 10;
-    updateScreen = true;
-  }
-  // Ensure the contrast stays within range
-  contrast = (contrast < 0) ? 0 : contrast;
-  contrast = (contrast > 100) ? 100 : contrast;
-
-  if (updateScreen) {
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("Contrast");
-    lcd.setCursor(0,1);
-    lcd.print("Left- Right+");
-    /*
-    lcd.setCursor(0,0);
-    lcd.print("Contrast:");
-    lcd.setCursor(0,1);
-    lcd.print(contrast);
-    */
-    updateScreen = false;
-  }
-}
-
 bool tunerOn = false;
 double tunerBase = 440.0;
+// How many half steps the tone is away from A4 (~440Hz)
 int tunerPitch = 0;
 
+// The names (A, A#, etc.) of the pitches
 const char * pitchNames[12];
+bool metronomeOn = false;
+int metronomeTempo = 100;
+// Number of beats per measure
+int metronomeBeats = 1;
+// Which beat the metronome is on
+int beatNumber = 0;
+bool playBeat = false;
+// For keeping track of tempo
+long long currentTime;
+long long oldTime;
 
 void initializePitchNames() {
   pitchNames[0] = "A";
@@ -157,24 +75,31 @@ void tunerScreen() {
   } else if (press2) {
     ++tunerPitch;
     updateScreen = true;
+  } else if (press12) {
+    tunerOn = false;
   }
 
   double oldBase = tunerBase;
+  // Use the potentiometer to decided the base pitch
   int potPitch = 6*analogRead(potPin)/1024;
+
   switch (potPitch) {
-    case 0: tunerBase = 415.0; break;
-    case 1: tunerBase = 430.0; break;
-    case 2: tunerBase = 440.0; break;
-    case 3: tunerBase = 441.0; break;
-    case 4: tunerBase = 442.0; break;
-    case 5: tunerBase = 443.0; break;
+    case 0: tunerBase = 415.0; break; // Baroque!
+    case 1: tunerBase = 430.0; break; // "Classical"
+    case 2: tunerBase = 440.0; break; // "Standard"
+    case 3: tunerBase = 441.0; break; // Meh
+    case 4: tunerBase = 442.0; break; // Meh
+    case 5: tunerBase = 443.0; break; // Just right
     default: tunerBase = 443.0;
   }
+
+  // Display the new base if it has changed.
   if (oldBase != tunerBase)
     updateScreen = true;
   
 
   if (tunerOn) {
+    // I'll just use equal temperament because it is easy
     tone(buzzerPin, tunerBase * pow(2.0, tunerPitch/12.0));
   } else {
     noTone(buzzerPin);
@@ -184,22 +109,30 @@ void tunerScreen() {
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Base: ");
-    lcd.print(tunerBase);
+    lcd.print((int) tunerBase);
+    lcd.print("Hz");
     lcd.setCursor(0,1);
     lcd.print("Note: ");
     lcd.print(pitchNames[(1200+tunerPitch) % 12]);
+    // This is the logic to determine the number that comes after
+    // the pitch name.
     lcd.print((57+tunerPitch)/12);
     updateScreen = false;
   }
 }
 
-bool metronomeOn = false;
-int metronomeTempo = 100;
-int metronomeBeats = 1;
-int beatNumber = 0;
-bool playBeat = false;
-long long currentTime;
-long long oldTime;
+// Print out a line showing which beat the metronome is on
+void printBeat(int num, int index) {
+  lcd.setCursor(0,1);
+  for (int i = 0; i < num; ++i) {
+    if (i == index) {
+      lcd.write(255);
+      lcd.print(" ");
+    } else {
+      lcd.print(". ");
+    }
+  }
+}
 
 void metronomeScreen() {
   currentTime = millis();
@@ -212,35 +145,50 @@ void metronomeScreen() {
   } else if (press2) {
     metronomeTempo += 2;
     updateScreen = true;
+  } else if (press12) {
+    metronomeOn = false;
   }
 
-  double oldBeats = metronomeBeats;
-  int potPitch = 4*analogRead(potPin)/1024;
-  if (oldBeats != metronomeBeats)
+  int oldBeats = metronomeBeats;
+  // Use the potentiometer to decide the beats per measure
+  metronomeBeats = 1 + 4*analogRead(potPin)/1024;
+  if (metronomeBeats != oldBeats)
     updateScreen = true;
-  
 
-  if (metronomeOn) {
-    if (currentTime - oldTime > (36000.0/metronomeTempo)) {
-      playBeat = true;
-    }
-  } else {
+  // Play a new beat every so often
+  // where "so often" is decided by the tempo
+  if (metronomeOn && currentTime - oldTime > (60000.0/metronomeTempo)) {
+    playBeat = true;
   }
 
   if (playBeat) {
-    tone(buzzerPin, 440, 50);
-    playBeat = false;
+    // For the first beat, play a higher pitch
+    if (beatNumber == 0) {
+      tone(buzzerPin, 660, 50);
+    } else {
+      tone(buzzerPin, 440, 50);
+    }
+    updateScreen = true;
     oldTime = currentTime;
   }
 
   if (updateScreen) {
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("Metronome");
-    lcd.setCursor(0,1);
-    lcd.print("Note: ");
+    lcd.print("Tempo: ");
+    lcd.print(metronomeTempo);
+    lcd.print("bpm");
+    printBeat(metronomeBeats, beatNumber);
     updateScreen = false;
   }
+
+  // This has to updated after the display logic in order for the
+  // LCD to match the sound
+  if (playBeat) {
+    beatNumber = (beatNumber + 1) % metronomeBeats;
+    playBeat = false;
+  }
+
 }
 
 // Determine if the button was just recently released
@@ -335,9 +283,6 @@ void checkButtons() {
   b3.prev = b3.cur;
 }
 
-
-
-
 void setup() {
   pinMode(contrastPin, OUTPUT);
 
@@ -349,6 +294,7 @@ void setup() {
   b3.prev = HIGH;
 
   initializePitchNames();
+  analogWrite(contrastPin, 0);
 
   Serial.begin(9600);
   lcd.begin(16, 2);
@@ -359,46 +305,20 @@ void setup() {
 }
 
 void loop() {
-  analogWrite(contrastPin, (contrast/100.0)*255);
-  //analogWrite(contrastPin, 0);
-
   checkButtons();
 
-/*
-  switch (curScreen) {
-    case 0: splashScreen(); break;
-    case 1: byteScreen(&num1, 1); break;
-    case 2: byteScreen(&num2, 2); break;
-    case 3: solutionScreen(); break;
-    case 4: contrastScreen(); break;
-  }
-*/
   switch (curScreen) {
     case 0: metronomeScreen(); break;
     case 1: tunerScreen(); break;
   }
-
   
   // Handle a next screen-press
   if (press12) {
     updateScreen = true;
     lcd.clear();
 
-    // Ensure that the splash screen is only shown at the beginning
-    if (curScreen == 4)
-      curScreen = 1;
-    else
-      ++curScreen;
+    curScreen = (curScreen + 1) % 2;
   }
-
-  //printf("At screen: %d\n", curScreen);
-  
-  //printf("contrast: %d\n", contrast);
-  //printf("bytes: %d %d\n", num1, num2);
-  
-  //printf("press: %d %d %d\n", press1, press2, press12);
-  
-  //Serial.println(analogRead(potPin));
 
   press1 = false;
   press2 = false;
